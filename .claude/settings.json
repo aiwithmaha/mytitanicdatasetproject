@@ -1,0 +1,53 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/block-rm.sh",
+            "shell": "bash",
+            "statusMessage": "Checking rm command safety..."
+          }
+        ]
+      },
+      {
+        "matcher": "PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/block-rm.sh",
+            "shell": "bash",
+            "statusMessage": "Checking Remove-Item command safety..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$f = ([Console]::In.ReadToEnd() | ConvertFrom-Json).tool_input.file_path; if ($f) { npx prettier --write $f }",
+            "shell": "powershell"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "Add-Type -AssemblyName System.Windows.Forms; $n = New-Object System.Windows.Forms.NotifyIcon; $n.Icon = [System.Drawing.SystemIcons]::Information; $n.Visible = $true; $n.ShowBalloonTip(3000, 'Claude Code', 'Claude Code needs your attention', 'Info'); Start-Sleep 4; $n.Dispose()",
+            "shell": "powershell"
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {}
+}
