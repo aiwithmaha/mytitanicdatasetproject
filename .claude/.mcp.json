@@ -2,28 +2,17 @@
   "mcpServers": {
     "tavily-local": {
       "command": "npx",
-      "args": [
-        "-y",
-        "tavily-mcp@latest"
-      ],
+      "args": ["-y", "tavily-mcp@latest"],
       "env": {
-        "TAVILY_API_KEY": "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"
+        "TAVILY_API_KEY": "${myTAVILY_API_KEY}"
       }
-    }
-  }
-
-}
-
-{
-  "mcpServers": {
-    "postgres": {
-      "type": "stdio",
+    },
+    "github": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-postgres",
-        "postgresql://claude_readonly:password@localhost:5432/mydb"
-      ]
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PAT}"
+      }
     }
   }
 }
