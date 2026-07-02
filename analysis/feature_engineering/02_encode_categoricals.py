@@ -1,6 +1,11 @@
 """Feature Engineering Step 2 — Encode categorical columns."""
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+# Force UTF-8 stdout/stderr so the arrow characters below don't crash on
+# Windows consoles that default to cp1252.
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 import pandas as pd
 import numpy as np

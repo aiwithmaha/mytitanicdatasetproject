@@ -18,9 +18,13 @@ SCRIPTS = [
     ("Model 3/4 — Feature Importance", "analysis/models/03_feature_importance.py"),
     ("Model 4/4 — Ensemble",           "analysis/models/04_ensemble.py"),
     # Visualization
-    ("Viz 1/3 — EDA Plots",            "analysis/visualization/01_plot_eda.py"),
-    ("Viz 2/3 — Model Results",        "analysis/visualization/02_plot_model_results.py"),
-    ("Viz 3/3 — Feature Importance",   "analysis/visualization/03_plot_feature_importance.py"),
+    ("Viz 1/5 — EDA Plots",            "analysis/visualization/01_plot_eda.py"),
+    ("Viz 2/5 — Model Results",        "analysis/visualization/02_plot_model_results.py"),
+    ("Viz 3/5 — Feature Importance",   "analysis/visualization/03_plot_feature_importance.py"),
+    ("Viz 4/5 — Survival Rates",       "analysis/visualization/04_plot_survival_rates.py"),
+    ("Viz 5/5 — Model Evaluation",     "analysis/visualization/05_plot_model_evaluation.py"),
+    # Report
+    ("Report — HTML Generation",       "analysis/generate_report.py"),
 ]
 
 passed, failed = [], []

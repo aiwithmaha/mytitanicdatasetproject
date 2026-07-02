@@ -20,9 +20,13 @@ colors = ['gold' if i == 0 else 'steelblue' for i in range(len(fi))]
 ax.barh(fi['feature'][::-1], fi['rf_importance'][::-1], color=colors[::-1], edgecolor='white')
 ax.set_title('Top 20 Feature Importances (Random Forest MDI)', fontsize=13, fontweight='bold')
 ax.set_xlabel('Importance Score')
+# Extend x-axis 15 % beyond max bar so value annotations don't get clipped
+ax.set_xlim(right=fi['rf_importance'].max() * 1.15)
 
 for i, (val, name) in enumerate(zip(fi['rf_importance'], fi['feature'])):
-    ax.text(0.001, len(fi)-1-i, f'{val:.4f}', va='center', fontsize=8)
+    # x must trail the bar tip, not sit at a fixed 0.001 (which clips against the y-axis)
+    ax.text(val + ax.get_xlim()[1] * 0.008, len(fi)-1-i,
+            f'{val:.4f}', va='center', fontsize=8)
 
 plt.tight_layout()
 os.makedirs('analysis/reports', exist_ok=True)

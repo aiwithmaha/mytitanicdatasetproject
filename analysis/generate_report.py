@@ -1,5 +1,5 @@
 """Generate a self-contained HTML analysis report with embedded images."""
-import base64, os, csv, sys
+import base64, os, csv, sys, datetime
 
 def img_b64(name):
     path = f'analysis/reports/{name}.png'
@@ -312,6 +312,11 @@ html = '''<!DOCTYPE html>
     ''' + img_tag('categorical_distributions', 'Categorical Distributions') + '''
   </div>
 
+  <div class="card">
+    <h3>Numeric Feature Distributions Overlaid by Survival Class</h3>
+    ''' + img_tag('eda_overview', 'EDA Overview') + '''
+  </div>
+
   <div class="three-col">
     <div class="insight red">
       <strong>Fare — HIGH SKEW (+4.79):</strong> 116 outliers detected.
@@ -385,6 +390,32 @@ html = '''<!DOCTYPE html>
       <h3>Features by Target Class</h3>
       ''' + img_tag('target_vs_features', 'Target vs Features') + '''
     </div>
+  </div>
+
+  <div class="card">
+    <h3>Survival Rate by Sex, Passenger Class &amp; Embarkation Port</h3>
+    ''' + img_tag('survival_by_category', 'Survival by Category') + '''
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <h3>Sex &times; Pclass — Survival Heatmap</h3>
+      ''' + img_tag('survival_heatmap_sex_pclass', 'Sex x Pclass Heatmap') + '''
+    </div>
+    <div class="card">
+      <h3>Box Plots by Survival Class</h3>
+      ''' + img_tag('boxplots_by_target', 'Boxplots by Target') + '''
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Age &amp; Fare KDE by Survival</h3>
+    ''' + img_tag('survival_age_fare_kde', 'Age Fare KDE') + '''
+  </div>
+
+  <div class="card">
+    <h3>Age vs Fare Scatter (log scale)</h3>
+    ''' + img_tag('scatter_age_fare', 'Age vs Fare Scatter') + '''
   </div>
 
   <div class="insight green">
@@ -510,13 +541,13 @@ html += '''
   </div>
 
   <div class="card">
-    <h3>EDA Feature Overview</h3>
-    ''' + img_tag('eda_overview', 'EDA Overview') + '''
+    <h3>ROC Curves &amp; Confusion Matrix (5-Fold CV)</h3>
+    ''' + img_tag('roc_and_confusion', 'ROC and Confusion Matrix') + '''
   </div>
 
   <div class="card">
-    <h3>Box Plots by Survival</h3>
-    ''' + img_tag('boxplots_by_target', 'Boxplots by Target') + '''
+    <h3>Learning Curves — Random Forest</h3>
+    ''' + img_tag('learning_curves', 'Learning Curves') + '''
   </div>
 
   <div class="three-col">
@@ -618,6 +649,11 @@ html += '''
 
 os.makedirs('analysis/reports', exist_ok=True)
 out_path = 'analysis/reports/titanic_analysis_report.html'
+
+# Substitute the build date everywhere it appears in the report
+_today = datetime.date.today().strftime('%Y-%m-%d')
+html = html.replace('2026-06-17', _today)
+
 with open(out_path, 'w', encoding='utf-8') as f:
     f.write(html)
 

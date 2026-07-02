@@ -27,7 +27,14 @@ for bar, val in zip(bars, df['cv_mean']):
 metric = df['metric'].iloc[0]
 ax.set_title(f'Model Comparison  |  Metric: {metric}', fontsize=13, fontweight='bold')
 ax.set_xlabel(f'CV Score ({metric})')
-ax.set_xlim(left=df['cv_mean'].min() * 0.95)
+
+# Start axis at a fixed floor (0.75) rather than min*0.95, which made a 1.2% gap
+# look like a massive difference.  Annotate so the truncation is explicit.
+x_floor = 0.75
+ax.set_xlim(left=x_floor)
+ax.annotate(f'Axis starts at {x_floor}', xy=(x_floor, -0.6),
+            xycoords=('data', 'axes fraction'),
+            fontsize=7, color='gray', style='italic')
 
 plt.tight_layout()
 os.makedirs('analysis/reports', exist_ok=True)
