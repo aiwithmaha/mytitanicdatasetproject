@@ -1,0 +1,216 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  # ---------------------------------------------------------------------
+  # 1. Lint / syntax check
+  # ---------------------------------------------------------------------
+  lint:
+    name: Lint (flake8)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install flake8
+        run: pip install flake8
+
+      - name: Determine lint targets
+        id: targets
+        shell: bash
+        run: |
+          TARGETS=""
+          [ -d analysis ] && TARGETS="$TARGETS analysis"
+          [ -d login ] && TARGETS="$TARGETS login"
+          echo "targets=$TARGETS" >> "$GITHUB_OUTPUT"
+          echo "Lint targets:${TARGETS:- (none found)}"
+
+      # Hard fail only on real bugs: syntax errors and undefined names.
+      # The existing analysis/ scripts carry a lot of pre-existing style
+      # debt (E401/E402/E221/etc.) that we intentionally don't gate on.
+      - name: flake8 - critical errors (blocking)
+        if: steps.targets.outputs.targets != ''
+        run: flake8 --select=E9,F63,F7,F82 --show-source --statistics ${{ steps.targets.outputs.targets }}
+
+      - name: flake8 - full style report (informational only)
+        if: steps.targets.outputs.targets != ''
+        continue-on-error: true
+        run: flake8 --statistics ${{ steps.targets.outputs.targets }}
+
+  # ---------------------------------------------------------------------
+  # 2. Analysis pipeline smoke test
+  # ---------------------------------------------------------------------
+  analysis-smoke-test:
+    name: Analysis pipeline smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: analysis/requirements.txt
+
+      - name: Install analysis dependencies
+        run: pip install -r analysis/requirements.txt
+
+      # run_all.py locates its input by globbing *.csv in the repo root
+      # (see analysis/eda/01_data_overview.py), so titanic.csv at the repo
+      # root is picked up automatically — no path wiring needed here.
+      #
+      # NOTE: run_all.py itself always exits 0, even when individual
+      # sub-scripts fail (it just prints a [FAILED] line and continues).
+      # We tee its output and grep for that marker so CI fails correctly.
+      - name: Run full analysis pipeline (run_all.py)
+        shell: bash
+        run: |
+          set -o pipefail
+          python analysis/run_all.py 2>&1 | tee run_all_output.log
+          if grep -q "\[FAILED\]" run_all_output.log; then
+            echo "::error::One or more analysis scripts failed — see log above."
+            exit 1
+          fi
+
+      - name: Upload generated reports (debug artifact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: analysis-reports
+          path: analysis/reports/
+          retention-days: 5
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------
+  # 3. Login backend test (Flask) — activates automatically once
+  #    login/server.py + login/requirements.txt exist on disk.
+  # ---------------------------------------------------------------------
+  login-backend-test:
+    name: Login backend test (Flask)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Check whether the login backend exists yet
+        id: check
+        shell: bash
+        run: |
+          if [ -f login/server.py ] && [ -f login/requirements.txt ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::login/server.py or login/requirements.txt not found — skipping login backend test. This job activates automatically once the Flask backend lands."
+          fi
+
+      - name: Install login backend dependencies
+        if: steps.check.outputs.found == 'true'
+        run: pip install -r login/requirements.txt
+
+      # Use disposable, CI-only credentials — never the real .env values
+      # (which aren't committed and won't exist on the runner anyway).
+      - name: Generate test credentials
+        if: steps.check.outputs.found == 'true'
+        id: creds
+        shell: bash
+        run: |
+          HASH=$(python -c "from werkzeug.security import generate_password_hash; print(generate_password_hash('ci-test-password-123'))")
+          echo "::add-mask::$HASH"
+          echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+
+      - name: Start Flask server
+        if: steps.check.outputs.found == 'true'
+        shell: bash
+        env:
+          LOGIN_USERNAME: ci-test-user@example.com
+          LOGIN_PASSWORD_HASH: ${{ steps.creds.outputs.hash }}
+        run: |
+          nohup python login/server.py > server.log 2>&1 &
+          echo $! > server.pid
+          for i in $(seq 1 20); do
+            if curl -s -o /dev/null http://127.0.0.1:5000/; then
+              echo "Server is up"
+              break
+            fi
+            sleep 0.5
+          done
+
+      - name: Test /login with correct credentials (expect 200)
+        if: steps.check.outputs.found == 'true'
+        shell: bash
+        run: |
+          STATUS=$(curl -s -o resp_ok.json -w "%{http_code}" -X POST http://127.0.0.1:5000/login \
+            -H "Content-Type: application/json" \
+            -d '{"username":"ci-test-user@example.com","password":"ci-test-password-123"}')
+          echo "Status: $STATUS"; cat resp_ok.json; echo
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::Expected 200 for correct credentials, got $STATUS"
+            exit 1
+          fi
+
+      - name: Test /login with incorrect credentials (expect 401)
+        if: steps.check.outputs.found == 'true'
+        shell: bash
+        run: |
+          STATUS=$(curl -s -o resp_bad.json -w "%{http_code}" -X POST http://127.0.0.1:5000/login \
+            -H "Content-Type: application/json" \
+            -d '{"username":"ci-test-user@example.com","password":"totally-wrong-password"}')
+          echo "Status: $STATUS"; cat resp_bad.json; echo
+          if [ "$STATUS" != "401" ]; then
+            echo "::error::Expected 401 for incorrect credentials, got $STATUS"
+            exit 1
+          fi
+
+      - name: Show server log (debug)
+        if: always() && steps.check.outputs.found == 'true'
+        shell: bash
+        run: cat server.log || true
+
+      - name: Stop Flask server
+        if: always() && steps.check.outputs.found == 'true'
+        shell: bash
+        run: kill "$(cat server.pid)" 2>/dev/null || true
+
+      - name: Skip summary
+        if: steps.check.outputs.found != 'true'
+        shell: bash
+        run: echo "SKIPPED — login backend not present on disk yet. Nothing to test."
+
+  # ---------------------------------------------------------------------
+  # 4. Deploy to Render — only on push to main, only after the jobs above
+  #    pass. Uses a Render deploy-hook URL stored as a repo secret; see
+  #    login/README.md ("Deploying to Render") for the one-time setup.
+  # ---------------------------------------------------------------------
+  deploy:
+    name: Deploy to Render
+    runs-on: ubuntu-latest
+    needs: [lint, analysis-smoke-test, login-backend-test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Trigger Render deploy hook
+        shell: bash
+        run: |
+          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
+            echo "::warning::RENDER_DEPLOY_HOOK_URL secret is not set — skipping deploy. See login/README.md (Deploying to Render) for setup steps."
+            exit 0
+          fi
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}")
+          echo "Render deploy hook responded with HTTP $STATUS"
+          if [ "$STATUS" -ge 300 ]; then
+            echo "::error::Render deploy hook call failed with HTTP $STATUS"
+            exit 1
+          fi

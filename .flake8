@@ -1,0 +1,14 @@
+[flake8]
+# Lightweight lint config. CI only hard-fails on the "critical" rule subset
+# (E9,F63,F7,F82 — syntax errors and undefined names) so this config just
+# sets sane defaults for the informational full-style report and for
+# anyone running flake8 locally.
+max-line-length = 120
+extend-exclude =
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    build,
+    dist,
+    analysis/reports

@@ -1,0 +1,23 @@
+# Render Blueprint for the login demo Flask app (login/server.py).
+#
+# This is a starter config, not an active deployment — Render only reads
+# this file if you create the service via "New +  > Blueprint" and point
+# it at this repo. If you instead create a plain "Web Service" by hand in
+# the Render dashboard, just copy the buildCommand/startCommand below into
+# that service's settings and this file is ignored.
+#
+# See login/README.md ("Deploying to Render") for the full setup steps.
+services:
+  - type: web
+    name: titanic-login-demo
+    env: python
+    plan: free
+    buildCommand: pip install -r login/requirements.txt
+    startCommand: gunicorn --chdir . -w 2 -b 0.0.0.0:$PORT login.server:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: LOGIN_USERNAME
+        sync: false # set manually in the Render dashboard — do not commit
+      - key: LOGIN_PASSWORD_HASH
+        sync: false # set manually in the Render dashboard — do not commit
